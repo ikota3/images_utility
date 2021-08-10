@@ -119,10 +119,10 @@ def pad_kanji_number(text: str):
     """
     kanji_numbers = ['壱', '弐', '参', '肆', '伍', '陸', '漆', '捌', '玖', '拾', '什']
     kanji_mapping = dict(zip(kanji_numbers, list(map(str, range(1, 11))) + ['10']))
-    match_result = re.search(r'\s*([' + '|'.join(kanji_numbers) + r'])\s*巻\s*', text)
+    match_result = re.search(r'\s*([' + '|'.join(kanji_numbers) + r'])\s*巻?\s*', text)
     if match_result:
         number = f' {kanji_mapping.get(match_result.group(1))} '
-        text = re.sub(r'\s*[' + '|'.join(kanji_numbers) + r']\s*巻\s*', number, text)
+        text = re.sub(r'\s*[' + '|'.join(kanji_numbers) + r']\s*巻?\s*', number, text)
 
     return text
 
@@ -161,8 +161,9 @@ def format_book_title(book_title: str) -> str:
     book_title = replace_fullwidth_round_brackets_to_halfwidth(book_title)
 
     # Replace unnecessary characters
-    book_title = re.sub(r'【.+】', '', book_title)
-    book_title = re.sub(r'[（＜〈]?(電子特別版|電子DX版?|電子書籍特典付き|新装版|電子版|.+?文庫電子応援店限定版|コミック)[〉＞）]?', '', book_title)
+    # book_title = re.sub(r'【.+?】', '', book_title)
+    book_title = re.sub(r'【.+?(付き|増量版|無料版?|出版|誌版|特別版?|特典付き?|漫画付き?)】', '', book_title)
+    book_title = re.sub(r'[(＜〈].*?(BOOKS|Creative|DX版?|GAMES|JOKER|Network|NOVELS|NOVEL 0|Publishing|エイジ|エクストラ|コミック|シリーズ|ス|ノベルズ|ラノベ|限定版|小説|新装版|電子版|特典付き|特別版|文芸|文庫J?|編集部)[〉＞)]', '', book_title)
     book_title = re.sub(r'[：:]', ' ', book_title)
     book_title = re.sub(r'\s+', ' ', book_title)
 
@@ -209,7 +210,7 @@ def format_book_title(book_title: str) -> str:
 def get_epub_info(filepath: str) -> dict:
     # metadata = epub_meta.get_epub_metadata(filepath)
     # return metadata
-    parser = etree.XMLParser(remove_comments=True, encoding='utf-8')
+    parser = etree.XMLParser(remove_comments=False, encoding='utf-8')
     epub_info_xml: etree.ElementTree = etree.XML(
         epub_meta.get_epub_opf_xml(filepath),
         parser
@@ -219,11 +220,17 @@ def get_epub_info(filepath: str) -> dict:
         'dc': 'http://purl.org/dc/elements/1.1/'
     }
 
+    # from xml.etree import ElementTree
+    # updated_title = re.search(r'(?<=name="Updated_Title" content=")(.+?)(?=")', etree.tostring(epub_info_xml, encoding='CP932').decode('cp932'))
+    # if updated_title:
+    #     title = updated_title.group(1)
+    # else:
+    #     title = epub_info_xml.xpath('//ns:metadata/dc:title/text()', namespaces=namespace)[0]
     title = epub_info_xml.xpath('//ns:metadata/dc:title/text()', namespaces=namespace)[0]
     author = epub_info_xml.xpath("//ns:metadata/dc:creator/text()", namespaces=namespace)
     genre = epub_info_xml.xpath("//ns:metadata/ns:meta[@name='book-type']/@content", namespaces=namespace)
     ret_val = {
-        'title': title.encode('cp932', errors='backslashreplace').decode('cp932'),
+        'title': title,
         'author': re.sub(r'( |　)', '', author[0]) if len(author) != 0 else 'NotFound',
         'genre': genre[0].upper() if genre else 'NotFound'
     }
@@ -319,7 +326,7 @@ class EPubInfo():
             # Get EPub info
             epub_info = get_epub_info(filepath)
 
-            print(f'{"Genre: " + epub_info.get("genre") + " " if genre else ""}rename "{os.path.basename(filepath)}" "[{format_book_author(epub_info.get("author"))}]{format_book_title(epub_info.get("title") + ".epub")}"')
+            print(f'{"Genre: " + epub_info.get("genre") + " " if genre else ""}rename "{os.path.basename(filepath)}" "[{format_book_author(epub_info.get("author"))}]{format_book_title(epub_info.get("title") + ".epub")}"'.encode('cp932', errors='backslashreplace').decode('cp932'))
 
     def unpack(self, output_dir: str = ''):
         """Unpack all images in EPub file.
@@ -367,7 +374,7 @@ class EPubInfo():
                 logger.info(f'EXTRACTING... {basename_without_ext}')
                 imagepaths_in_epub = [
                     path.filename for path in epub_file.filelist
-                    if path.filename.endswith(('.jpg', '.jpeg', '.png')) and not re.search(r'[\\\/]public(image|_image| image)s?', path.filename)
+                    if path.filename.endswith(('.jpg', '.jpeg', '.png', '.gif')) and not re.search(r'[\\\/]public(image|_image| image)s?', path.filename)
                 ]
                 with alive_bar(len(imagepaths_in_epub), bar='filling') as bar:
                     for imagepath_in_epub in imagepaths_in_epub:
