@@ -74,6 +74,25 @@ class CompressDir():
         return is_valid
 
     def compress(self):
+        """Compress each directories directly below to the input directory.
+
+        Synopsis:
+            python src/compress_dir.py compress -i 'path/to/dir' [OPTIONS]
+
+        Description:
+            Compress each directories directly below to the given input directory.
+            The default compress file format is ZIP.
+
+        Options:
+            -o, --output_dir <path/to/dir>      Where the compressed file will be output.
+                                                If this option was not specified, it will be the same as input directory(-i, --input_dir).
+
+            -f, --format_type <format-type>     What kind of format to use.
+                                                The avaliable format types is zip only.
+                                                If this option was not specified, it will be set to ZIP.
+
+            -y, --yes                           Execute immediately without asking.
+        """
         show_info(self)
         if not self._input_is_valid():
             logger.info('Input parameter is not valid. Try again.')
